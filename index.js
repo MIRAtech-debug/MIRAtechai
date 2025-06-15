@@ -75,13 +75,13 @@ client.on('messageCreate', (message) => {
   data.messageCounts[userId]++;
   saveData();
 
-  console.log(`${message.author.username} hat ${data.messageCounts[userId]} Nachrichten gesendet.`);
+  console.log(`${message.author.username} has sent ${data.messageCounts[userId]} Messages.`);
 
   if (data.messageCounts[userId] === 100) {
     const role = message.guild.roles.cache.find(role => role.name === 'Rookie Pilot');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} ist jetzt ein Rookie Pilot! Willkommen an Bord! 🚀`);
+      message.channel.send(`${message.author.username} is now a Rookie Pilot! Welcome on Bord! 🚀`);
     }
   }
 
@@ -89,7 +89,7 @@ client.on('messageCreate', (message) => {
     const role = message.guild.roles.cache.find(role => role.name === 'Wingman');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} ist jetzt ein Wingman! Bereit für die nächste Mission? 🛡️`);
+      message.channel.send(`${message.author.username} is now a Wingman! Ready for the next Mission? 🛡️`);
     }
   }
 
@@ -97,7 +97,7 @@ client.on('messageCreate', (message) => {
     const role = message.guild.roles.cache.find(role => role.name === 'Veteran Pilot');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} ist jetzt ein Veteran Pilot! Respekt! ✨`);
+      message.channel.send(`${message.author.username} is now a Veteran Pilot! Respekt! ✨`);
     }
   }
 
@@ -105,7 +105,7 @@ client.on('messageCreate', (message) => {
     const role = message.guild.roles.cache.find(role => role.name === 'Fleet Commander');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} ist jetzt ein Fleet Commander! Kommando übernommen! 👑`);
+      message.channel.send(`${message.author.username} is now a Fleet Commander! Taken command! 👑`);
     }
   }
 });
@@ -129,7 +129,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
     data.voiceDurations[userId] += duration;
 
-    console.log(`${newState.member.user.username} war insgesamt ${Math.round(data.voiceDurations[userId])} Sekunden im Voice-Chat.`);
+    console.log(`${newState.member.user.username} has spent ${Math.round(data.voiceDurations[userId])} seconds in Voice-Chat.`);
 
     delete data.voiceTimes[userId];
     saveData();
@@ -154,6 +154,6 @@ client.on('messageCreate', (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    message.channel.send(`${message.author.username}, du hast ${messages} Nachrichten gesendet und warst ${hours}h ${minutes}m ${seconds}s im Voice-Chat.`);
+    message.channel.send(`${message.author.username}, you have sent ${messages} Messages and was ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
   }
 });
