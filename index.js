@@ -136,15 +136,17 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   }
 });
 
-// !mystats Befehl
+// Befehle
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
 
   const prefix = '!';
   if (!message.content.startsWith(prefix)) return;
 
-  const [command] = message.content.slice(prefix.length).trim().split(/\s+/);
+  const args = message.content.slice(prefix.length).trim().split(/\s+/);
+  const command = args.shift().toLowerCase();
 
+  // !mystats (besteht schon)
   if (command === 'mystats') {
     const userId = message.author.id;
     const messages = data.messageCounts[userId] || 0;
@@ -154,6 +156,88 @@ client.on('messageCreate', (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    message.channel.send(`${message.author.username}, you have sent ${messages} Messages and was ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
+    return message.channel.send(`${message.author.username}, you have sent ${messages} Messages and was ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
+  }
+
+  // !userstats @User
+  if (command === 'userstats') {
+    if (args.length === 0) {
+      return message.channel.send('Bitte erwähne einen User, z.B. !userstats @User');
+    }
+    const user = message.mentions.users.first();
+    if (!user) return message.channel.send('Bitte einen gültigen User erwähnen.');
+
+    const userId = user.id;
+    const messages = data.messageCounts[userId] || 0;
+    const voiceTime = Math.round(data.voiceDurations[userId] || 0);
+
+    const hours = Math.floor(voiceTime / 3600);
+    const minutes = Math.floor((voiceTime % 3600) / 60);
+    const seconds = Math.floor(voiceTime % 60);
+
+    return message.channel.send(`${user.username} hat ${messages} Nachrichten geschrieben und war ${hours}h ${minutes}m ${seconds}s im Voice-Chat.`);
+  }
+
+  // !resetstats @User (Admin only)
+  if (command === 'resetstats') {
+    if (!message.member.permissions.has('ManageGuild')) {
+      return message.channel.send('Du hast keine Berechtigung, diesen Befehl zu verwenden.');
+    }
+    if (args.length === 0) {
+      return message.channel.send('Bitte erwähne einen User, z.B. !resetstats @User');
+    }
+    const user = message.mentions.users.first();
+    if (!user) return message.channel.send('Bitte einen gültigen User erwähnen.');
+
+    const userId = user.id;
+    delete data.messageCounts[userId];
+    delete data.voiceDurations[userId];
+    delete data.voiceTimes[userId];
+    saveData();
+
+    return message.channel.send(`Statistiken von ${user.username} wurden zurückgesetzt.`);
+  }
+
+  // !topchatters
+  if (command === 'topchatters') {
+    // sortiere Nutzer nach Nachrichtenanzahl
+    const sortedUsers = Object.entries(data.messageCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    if (sortedUsers.length === 0) return message.channel.send('Keine Nachrichten-Daten verfügbar.');
+
+    let reply = '**Top 5 Chatter:**\n';
+    sortedUsers.forEach(([userId, count], i) => {
+      const user = client.users.cache.get(userId);
+      const username = user ? user.username : 'Unbekannt';
+      reply += `${i + 1}. ${username}: ${count} Nachrichten\n`;
+    });
+
+    return message.channel.send(reply);
+  }
+
+  // !topvoice
+  if (command === 'topvoice') {
+    // sortiere Nutzer nach Voice-Zeit
+    const sortedUsers = Object.entries(data.voiceDurations)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    if (sortedUsers.length === 0) return message.channel.send('Keine Voice-Chat-Daten verfügbar.');
+
+    let reply = '**Top 5 Voice-Chat Nutzer:**\n';
+    sortedUsers.forEach(([userId, seconds], i) => {
+      const user = client.users.cache.get(userId);
+      const username = user ? user.username : 'Unbekannt';
+
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+
+      reply += `${i + 1}. ${username}: ${h}h ${m}m ${s}s\n`;
+    });
+
+    return message.channel.send(reply);
   }
 });
