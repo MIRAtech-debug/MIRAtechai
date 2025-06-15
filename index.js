@@ -66,7 +66,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
     data.voiceDurations[userId] += duration;
 
-    console.log(`${newState.member.user.username} hat jetzt insgesamt ${Math.round(data.voiceDurations[userId])} Sekunden im Voice-Chat verbracht.`);
+    console.log(`${newState.member.user.username} has now spent a total ${Math.round(data.voiceDurations[userId])} Sekonds in Voice-Chat.`);
 
     delete data.voiceTimes[userId];
     saveData();
@@ -93,7 +93,7 @@ client.on('messageCreate', async (message) => {
   data.messageCounts[userId]++;
   saveData();
 
-  console.log(`${message.author.username} hat ${data.messageCounts[userId]} Nachrichten gesendet.`);
+  console.log(`${message.author.username} has sent ${data.messageCounts[userId]} Messages.`);
 
   const count = data.messageCounts[userId];
 
@@ -130,14 +130,14 @@ client.on('messageCreate', async (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${message.author.username}, du hast ${messages} Nachrichten gesendet und ${hours}h ${minutes}m ${seconds}s im Voice-Chat verbracht.`);
+    return message.channel.send(`${message.author.username}, you have sentt ${messages} Messages and spent ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
   }
 
   if (command === 'userstats') {
-    if (args.length === 0) return message.channel.send('Bitte erwähne einen Nutzer, z.B. !userstats @User');
+    if (args.length === 0) return message.channel.send('Please mention a user, e.g. !userstats @User');
 
     const user = message.mentions.users.first();
-    if (!user) return message.channel.send('Bitte erwähne einen gültigen Nutzer.');
+    if (!user) return message.channel.send('Please mention a valid user.');
 
     const uid = user.id;
     const messages = data.messageCounts[uid] || 0;
@@ -147,17 +147,17 @@ client.on('messageCreate', async (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${user.username} hat ${messages} Nachrichten gesendet und ${hours}h ${minutes}m ${seconds}s im Voice-Chat verbracht.`);
+    return message.channel.send(`${user.username} has sent ${messages} Messages and spent ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
   }
 
   if (command === 'resetstats') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-      return message.channel.send('Du hast keine Berechtigung, diesen Befehl zu nutzen.');
+      return message.channel.send('You do not have permission to use this command.');
     }
-    if (args.length === 0) return message.channel.send('Bitte erwähne einen Nutzer, z.B. !resetstats @User');
+    if (args.length === 0) return message.channel.send('Please mention a user, e.g. !resetstats @User');
 
     const user = message.mentions.users.first();
-    if (!user) return message.channel.send('Bitte erwähne einen gültigen Nutzer.');
+    if (!user) return message.channel.send('Please mention a valid user.');
 
     const uid = user.id;
     delete data.messageCounts[uid];
@@ -165,28 +165,28 @@ client.on('messageCreate', async (message) => {
     delete data.voiceTimes[uid];
     saveData();
 
-    return message.channel.send(`Statistiken von ${user.username} wurden zurückgesetzt.`);
+    return message.channel.send(`Statistiks from ${user.username} have been reset.`);
   }
 
   if (command === 'topchatters') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-      return message.channel.send('Du hast keine Berechtigung, diesen Befehl zu nutzen.');
+      return message.channel.send('You do not have permission to use this command.');
     }
 
     const sortedUsers = Object.entries(data.messageCounts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Nachrichten-Daten vorhanden.');
+    if (sortedUsers.length === 0) return message.channel.send('No message data available.');
 
     let reply = '**Top 5 Chatters:**\n';
 
     const lines = await Promise.all(sortedUsers.map(async ([uid, count], i) => {
       try {
         const member = await message.guild.members.fetch(uid);
-        return `${i + 1}. ${member.user.username}: ${count} Nachrichten`;
+        return `${i + 1}. ${member.user.username}: ${count} Messages`;
       } catch {
-        return `${i + 1}. (Unbekannter Nutzer): ${count} Nachrichten`;
+        return `${i + 1}. (Unknown User): ${count} Messages`;
       }
     }));
 
@@ -196,16 +196,16 @@ client.on('messageCreate', async (message) => {
 
   if (command === 'topvoice') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-      return message.channel.send('Du hast keine Berechtigung, diesen Befehl zu nutzen.');
+      return message.channel.send('You do not have permission to use this command.');
     }
 
     const sortedUsers = Object.entries(data.voiceDurations)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Voice-Chat-Daten vorhanden.');
+    if (sortedUsers.length === 0) return message.channel.send('No voice chat data available.');
 
-    let reply = '**Top 5 Voice Chat Nutzer:**\n';
+    let reply = '**Top 5 Voice Chat Users:**\n';
 
     const lines = await Promise.all(sortedUsers.map(async ([uid, seconds], i) => {
       const h = Math.floor(seconds / 3600);
@@ -216,7 +216,7 @@ client.on('messageCreate', async (message) => {
         const member = await message.guild.members.fetch(uid);
         return `${i + 1}. ${member.user.username}: ${h}h ${m}m ${s}s`;
       } catch {
-        return `${i + 1}. (Unbekannter Nutzer): ${h}h ${m}m ${s}s`;
+        return `${i + 1}. (Unknown user): ${h}h ${m}m ${s}s`;
       }
     }));
 
