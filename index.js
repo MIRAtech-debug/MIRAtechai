@@ -49,7 +49,7 @@ client.once('ready', () => {
 // Login mit Token aus Umgebungsvariable (z.B. in .env Datei oder Hosting-Konfiguration)
 client.login(process.env.BOT_TOKEN);
 
-// Welcome neue User in #introductions
+// Welcome new users in #introductions
 client.on('messageCreate', (message) => {
   if (message.channel.name === 'introductions' && !message.author.bot) {
     const userId = message.author.id;
@@ -62,7 +62,7 @@ client.on('messageCreate', (message) => {
   }
 });
 
-// Nachrichten zählen & Rollen vergeben
+// Count messages & assign roles
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
 
@@ -75,13 +75,13 @@ client.on('messageCreate', (message) => {
   data.messageCounts[userId]++;
   saveData();
 
-  console.log(`${message.author.username} has sent ${data.messageCounts[userId]} Messages.`);
+  console.log(`${message.author.username} has sent ${data.messageCounts[userId]} messages.`);
 
   if (data.messageCounts[userId] === 100) {
     const role = message.guild.roles.cache.find(role => role.name === 'Rookie Pilot');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} is now a Rookie Pilot! Welcome on Bord! 🚀`);
+      message.channel.send(`${message.author.username} is now a Rookie Pilot! Welcome aboard! 🚀`);
     }
   }
 
@@ -89,7 +89,7 @@ client.on('messageCreate', (message) => {
     const role = message.guild.roles.cache.find(role => role.name === 'Wingman');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} is now a Wingman! Ready for the next Mission? 🛡️`);
+      message.channel.send(`${message.author.username} is now a Wingman! Ready for the next mission? 🛡️`);
     }
   }
 
@@ -97,7 +97,7 @@ client.on('messageCreate', (message) => {
     const role = message.guild.roles.cache.find(role => role.name === 'Veteran Pilot');
     if (role) {
       message.member.roles.add(role);
-      message.channel.send(`${message.author.username} is now a Veteran Pilot! Respekt! ✨`);
+      message.channel.send(`${message.author.username} is now a Veteran Pilot! Respect! ✨`);
     }
   }
 
@@ -110,17 +110,17 @@ client.on('messageCreate', (message) => {
   }
 });
 
-// Voice-Chat-Zeit tracken
+// Track voice chat time
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
 
-  // Beitritt
+  // Join voice channel
   if (!oldState.channel && newState.channel) {
     data.voiceTimes[userId] = Date.now();
     saveData();
   }
 
-  // Austritt
+  // Leave voice channel
   if (oldState.channel && !newState.channel && data.voiceTimes[userId]) {
     const duration = (Date.now() - data.voiceTimes[userId]) / 1000;
 
@@ -129,14 +129,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
     data.voiceDurations[userId] += duration;
 
-    console.log(`${newState.member.user.username} has spent ${Math.round(data.voiceDurations[userId])} seconds in Voice-Chat.`);
+    console.log(`${newState.member.user.username} has spent ${Math.round(data.voiceDurations[userId])} seconds in voice chat.`);
 
     delete data.voiceTimes[userId];
     saveData();
   }
 });
 
-// Befehle
+// Commands
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
 
@@ -146,7 +146,7 @@ client.on('messageCreate', (message) => {
   const args = message.content.slice(prefix.length).trim().split(/\s+/);
   const command = args.shift().toLowerCase();
 
-  // !mystats (besteht schon)
+  // !mystats
   if (command === 'mystats') {
     const userId = message.author.id;
     const messages = data.messageCounts[userId] || 0;
@@ -156,16 +156,16 @@ client.on('messageCreate', (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${message.author.username}, you have sent ${messages} Messages and was ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
+    return message.channel.send(`${message.author.username}, you have sent ${messages} messages and spent ${hours}h ${minutes}m ${seconds}s in voice chat.`);
   }
 
   // !userstats @User
   if (command === 'userstats') {
     if (args.length === 0) {
-      return message.channel.send('Bitte erwähne einen User, z.B. !userstats @User');
+      return message.channel.send('Please mention a user, e.g. !userstats @User');
     }
     const user = message.mentions.users.first();
-    if (!user) return message.channel.send('Bitte einen gültigen User erwähnen.');
+    if (!user) return message.channel.send('Please mention a valid user.');
 
     const userId = user.id;
     const messages = data.messageCounts[userId] || 0;
@@ -175,19 +175,19 @@ client.on('messageCreate', (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${user.username} hat ${messages} Nachrichten geschrieben und war ${hours}h ${minutes}m ${seconds}s im Voice-Chat.`);
+    return message.channel.send(`${user.username} has sent ${messages} messages and spent ${hours}h ${minutes}m ${seconds}s in voice chat.`);
   }
 
   // !resetstats @User (Admin only)
   if (command === 'resetstats') {
     if (!message.member.permissions.has('ManageGuild')) {
-      return message.channel.send('Du hast keine Berechtigung, diesen Befehl zu verwenden.');
+      return message.channel.send('You do not have permission to use this command.');
     }
     if (args.length === 0) {
-      return message.channel.send('Bitte erwähne einen User, z.B. !resetstats @User');
+      return message.channel.send('Please mention a user, e.g. !resetstats @User');
     }
     const user = message.mentions.users.first();
-    if (!user) return message.channel.send('Bitte einen gültigen User erwähnen.');
+    if (!user) return message.channel.send('Please mention a valid user.');
 
     const userId = user.id;
     delete data.messageCounts[userId];
@@ -195,41 +195,47 @@ client.on('messageCreate', (message) => {
     delete data.voiceTimes[userId];
     saveData();
 
-    return message.channel.send(`Statistiken von ${user.username} wurden zurückgesetzt.`);
+    return message.channel.send(`Statistics for ${user.username} have been reset.`);
   }
 
-  // !topchatters
+  // !topchatters (Admin only)
   if (command === 'topchatters') {
-    // sortiere Nutzer nach Nachrichtenanzahl
+    if (!message.member.permissions.has('ManageGuild')) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+
     const sortedUsers = Object.entries(data.messageCounts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Nachrichten-Daten verfügbar.');
+    if (sortedUsers.length === 0) return message.channel.send('No message data available.');
 
-    let reply = '**Top 5 Chatter:**\n';
+    let reply = '**Top 5 Chatters:**\n';
     sortedUsers.forEach(([userId, count], i) => {
       const user = client.users.cache.get(userId);
-      const username = user ? user.username : 'Unbekannt';
-      reply += `${i + 1}. ${username}: ${count} Nachrichten\n`;
+      const username = user ? user.username : 'Unknown';
+      reply += `${i + 1}. ${username}: ${count} messages\n`;
     });
 
     return message.channel.send(reply);
   }
 
-  // !topvoice
+  // !topvoice (Admin only)
   if (command === 'topvoice') {
-    // sortiere Nutzer nach Voice-Zeit
+    if (!message.member.permissions.has('ManageGuild')) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+
     const sortedUsers = Object.entries(data.voiceDurations)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Voice-Chat-Daten verfügbar.');
+    if (sortedUsers.length === 0) return message.channel.send('No voice chat data available.');
 
-    let reply = '**Top 5 Voice-Chat Nutzer:**\n';
+    let reply = '**Top 5 Voice Chat Users:**\n';
     sortedUsers.forEach(([userId, seconds], i) => {
       const user = client.users.cache.get(userId);
-      const username = user ? user.username : 'Unbekannt';
+      const username = user ? user.username : 'Unknown';
 
       const h = Math.floor(seconds / 3600);
       const m = Math.floor((seconds % 3600) / 60);
