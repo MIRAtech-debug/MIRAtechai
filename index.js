@@ -10,7 +10,8 @@ let data = {
   messageCounts: {},
   voiceTimes: {},
   voiceDurations: {},
-  locked: false,  // Bot Lock Status
+  locked: false,
+  events: []
 };
 
 // Daten laden, falls vorhanden
@@ -51,24 +52,36 @@ client.once('ready', () => {
 
 client.login(process.env.BOT_TOKEN);
 
-// Helper: Prüfe, ob Member eine Rolle aus Liste hat
 function hasRole(member, roleNames) {
-  return roleNames.some(roleName =>
-    member.roles.cache.some(r => r.name.toLowerCase() === roleName.toLowerCase())
-  );
+  return roleNames.some(roleName => member.roles.cache.some(r => r.name.toLowerCase() === roleName.toLowerCase()));
 }
+
+function isAdmin(member) {
+  return member.permissions.has(PermissionsBitField.Flags.Administrator) || hasRole(member, ['Senator']);
+}
+
+// Auto-assign Member Rolle beim Joinen
+client.on('guildMemberAdd', async member => {
+  const role = member.guild.roles.cache.find(r => r.name.toLowerCase() === 'member');
+  if (role) {
+    try {
+      await member.roles.add(role);
+      console.log(`Rolle 'Member' an ${member.user.username} vergeben.`);
+    } catch (error) {
+      console.error(`Fehler beim Zuweisen der Rolle an ${member.user.username}:`, error);
+    }
+  }
+});
 
 // VoiceState Update - VoiceChat Zeit tracken
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
 
-  // User betritt VoiceChannel
   if (!oldState.channel && newState.channel) {
     data.voiceTimes[userId] = Date.now();
     saveData();
   }
 
-  // User verlässt VoiceChannel
   if (oldState.channel && !newState.channel && data.voiceTimes[userId]) {
     const duration = (Date.now() - data.voiceTimes[userId]) / 1000;
 
@@ -88,24 +101,12 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // Falls Bot gesperrt und Nutzer kein Admin: keine Commands ausführen
-  if (data.locked && !hasRole(message.member, ['admin'])) {
-    return message.channel.send('⚠️ Der Bot ist derzeit gesperrt und kann keine Befehle ausführen.');
+  // Wenn Bot gelockt ist, nur Admins können Befehle ausführen
+  if (data.locked && !isAdmin(message.member)) {
+    return message.channel.send('Der Bot ist derzeit gesperrt. Nur Senatoren können Befehle ausführen.');
   }
 
   const userId = message.author.id;
-
-  // Auto assign "Member" Rolle wenn neu im Server und keine Rolle hat
-  if (message.guild && !hasRole(message.member, ['Member'])) {
-    const memberRole = message.guild.roles.cache.find(r => r.name === 'Member');
-    if (memberRole) {
-      try {
-        await message.member.roles.add(memberRole);
-      } catch (err) {
-        console.error('Fehler bei Auto-Assign Member Rolle:', err);
-      }
-    }
-  }
 
   // Begrüßung im introductions-Kanal
   if (message.channel.name === 'introductions') {
@@ -150,45 +151,50 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(prefix.length).trim().split(/\s+/);
   const command = args.shift().toLowerCase();
 
-  // --- /serverstats ---
+  // Help Command
+  if (command === 'help') {
+    return message.channel.send(
+      `**Verfügbare Befehle:**\n` +
+      `!serverstats - Zeigt Serverstatistiken an\n` +
+      `!mystats - Zeigt deine Statistiken an\n` +
+      `!userstats @User - Zeigt Statistiken eines Users an\n` +
+      `!resetstats @User - Setzt Statistiken eines Users zurück (Admin)\n` +
+      `!topchatters - Top 5 Chatter anzeigen (Admin)\n` +
+      `!topvoice - Top 5 Voice-Chat Benutzer (Admin)\n` +
+      `!test - Testbefehl (Admin)\n` +
+      `!createevent [Titel] | [Datum] | [Beschreibung] - Event erstellen (Senator)\n` +
+      `!lockbot - Bot sperren/entsperren (Senator)\n`
+    );
+  }
+
+  // Server Stats
   if (command === 'serverstats') {
     const guild = message.guild;
     if (!guild) return message.channel.send('Dieser Befehl kann nur in einem Server genutzt werden.');
 
     const totalMembers = guild.memberCount;
     const onlineMembers = guild.members.cache.filter(m => m.presence?.status === 'online').size;
-    const botCount = guild.members.cache.filter(m => m.user.bot).size;
     const rolesCount = guild.roles.cache.size;
     const channelsCount = guild.channels.cache.size;
 
     return message.channel.send(
-      `📊 **Serverstatistiken für ${guild.name}:**\n` +
-      `- Mitglieder gesamt: ${totalMembers}\n` +
-      `- Online Mitglieder: ${onlineMembers}\n` +
-      `- Bots: ${botCount}\n` +
-      `- Rollen: ${rolesCount}\n` +
-      `- Kanäle: ${channelsCount}`
+      `**Serverstatistiken für ${guild.name}:**\n` +
+      `Mitglieder: ${totalMembers}\n` +
+      `Online: ${onlineMembers}\n` +
+      `Rollen: ${rolesCount}\n` +
+      `Kanäle: ${channelsCount}`
     );
   }
 
-  // --- /help ---
-  if (command === 'help') {
-    return message.channel.send(
-      `**Verfügbare Commands:**\n` +
-      `- !serverstats: Zeigt Serverstatistiken an\n` +
-      `- !mystats: Zeigt deine Statistiken\n` +
-      `- !userstats @User: Zeigt Statistiken eines Users\n` +
-      `- !resetstats @User: Setzt Statistiken zurück (Admin)\n` +
-      `- !topchatters: Zeigt die Top 5 Chatter (Admin)\n` +
-      `- !topvoice: Zeigt die Top 5 Voice Chat Nutzer (Admin)\n` +
-      `- !lockbot: Sperrt den Bot (Admin)\n` +
-      `- !unlockbot: Entsperrt den Bot (Admin)\n` +
-      `- !create event <Name>: Erstellt ein Event (Admin)\n` +
-      `- !test: Test-Command (Admin)`
-    );
+  // Test Command
+  if (command === 'test') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
+    }
+    return message.channel.send('Test erfolgreich! Der Bot funktioniert.');
   }
 
-  // --- /mystats ---
+  // Mystats
   if (command === 'mystats') {
     const messages = data.messageCounts[userId] || 0;
     const voiceTime = Math.round(data.voiceDurations[userId] || 0);
@@ -197,10 +203,10 @@ client.on('messageCreate', async (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${message.author.username}, du hast ${messages} Nachrichten gesendet und warst ${hours}h ${minutes}m ${seconds}s im Voice-Chat.`);
+    return message.channel.send(`${message.author.username}, du hast ${messages} Nachrichten gesendet und ${hours}h ${minutes}m ${seconds}s im Voice-Chat verbracht.`);
   }
 
-  // --- /userstats ---
+  // Userstats
   if (command === 'userstats') {
     if (args.length === 0) return message.channel.send('Bitte erwähne einen Nutzer, z.B. !userstats @User');
 
@@ -215,12 +221,12 @@ client.on('messageCreate', async (message) => {
     const minutes = Math.floor((voiceTime % 3600) / 60);
     const seconds = Math.floor(voiceTime % 60);
 
-    return message.channel.send(`${user.username} hat ${messages} Nachrichten gesendet und war ${hours}h ${minutes}m ${seconds}s im Voice-Chat.`);
+    return message.channel.send(`${user.username} hat ${messages} Nachrichten gesendet und ${hours}h ${minutes}m ${seconds}s im Voice-Chat verbracht.`);
   }
 
-  // --- /resetstats ---
+  // Resetstats
   if (command === 'resetstats') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild) && !hasRole(message.member, ['admin'])) {
+    if (!isAdmin(message.member)) {
       return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
     }
     if (args.length === 0) return message.channel.send('Bitte erwähne einen Nutzer, z.B. !resetstats @User');
@@ -237,9 +243,9 @@ client.on('messageCreate', async (message) => {
     return message.channel.send(`Statistiken von ${user.username} wurden zurückgesetzt.`);
   }
 
-  // --- /topchatters ---
+  // Topchatters
   if (command === 'topchatters') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild) && !hasRole(message.member, ['admin'])) {
+    if (!isAdmin(message.member)) {
       return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
     }
 
@@ -247,7 +253,7 @@ client.on('messageCreate', async (message) => {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Nachrichtendaten verfügbar.');
+    if (sortedUsers.length === 0) return message.channel.send('Keine Nachrichtendaten vorhanden.');
 
     let reply = '**Top 5 Chatter:**\n';
 
@@ -264,9 +270,9 @@ client.on('messageCreate', async (message) => {
     return message.channel.send(reply);
   }
 
-  // --- /topvoice ---
+  // Topvoice
   if (command === 'topvoice') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild) && !hasRole(message.member, ['admin'])) {
+    if (!isAdmin(message.member)) {
       return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
     }
 
@@ -274,9 +280,9 @@ client.on('messageCreate', async (message) => {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    if (sortedUsers.length === 0) return message.channel.send('Keine Voice-Chat Daten verfügbar.');
+    if (sortedUsers.length === 0) return message.channel.send('Keine Voice-Chat Daten vorhanden.');
 
-    let reply = '**Top 5 Voice Chat Nutzer:**\n';
+    let reply = '**Top 5 Voice-Chat Benutzer:**\n';
 
     const lines = await Promise.all(sortedUsers.map(async ([uid, seconds], i) => {
       const h = Math.floor(seconds / 3600);
@@ -295,49 +301,38 @@ client.on('messageCreate', async (message) => {
     return message.channel.send(reply);
   }
 
-  // --- /lockbot ---
+  // Create Event - nur Senatoren dürfen
+  if (command === 'createevent') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('Du hast keine Berechtigung, Events zu erstellen.');
+    }
+
+    // Syntax: !createevent Titel | Datum | Beschreibung
+    const input = args.join(' ');
+    const parts = input.split('|').map(p => p.trim());
+
+    if (parts.length < 3) {
+      return message.channel.send('Falsches Format! Nutze: !createevent Titel | Datum | Beschreibung');
+    }
+
+    const [title, date, description] = parts;
+
+    const event = { title, date, description, createdBy: message.author.username, createdAt: new Date().toISOString() };
+    data.events.push(event);
+    saveData();
+
+    return message.channel.send(`Event "${title}" am ${date} wurde erstellt.`);
+  }
+
+  // Lock Bot - nur Senatoren dürfen
   if (command === 'lockbot') {
-    if (!hasRole(message.member, ['admin'])) {
-      return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
+    if (!isAdmin(message.member)) {
+      return message.channel.send('Du hast keine Berechtigung, den Bot zu sperren/entsperren.');
     }
-    if (data.locked) return message.channel.send('Der Bot ist bereits gesperrt.');
 
-    data.locked = true;
+    data.locked = !data.locked;
     saveData();
-    return message.channel.send('🔒 Bot wurde gesperrt.');
-  }
 
-  // --- /unlockbot ---
-  if (command === 'unlockbot') {
-    if (!hasRole(message.member, ['admin'])) {
-      return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
-    }
-    if (!data.locked) return message.channel.send('Der Bot ist nicht gesperrt.');
-
-    data.locked = false;
-    saveData();
-    return message.channel.send('🔓 Bot wurde entsperrt.');
-  }
-
-  // --- /test ---
-  if (command === 'test') {
-    if (!hasRole(message.member, ['admin'])) {
-      return message.channel.send('Du hast keine Berechtigung für diesen Befehl.');
-    }
-    return message.channel.send('Test erfolgreich! Der Bot funktioniert.');
-  }
-
-  // --- /create event ---
-  if (command === 'create') {
-    if (args[0] !== 'event') return;
-
-    if (!hasRole(message.member, ['admin'])) {
-      return message.channel.send('Nur Admins können Events erstellen.');
-    }
-
-    const eventName = args.slice(1).join(' ');
-    if (!eventName) return message.channel.send('Bitte gib einen Eventnamen an. Beispiel: !create event Raid Night');
-
-    return message.channel.send(`📅 Neues Event erstellt: **${eventName}**\nDatum & Details folgen...`);
+    return message.channel.send(`Der Bot wurde jetzt ${data.locked ? 'gesperrt' : 'entsperrt'}.`);
   }
 });
