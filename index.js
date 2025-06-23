@@ -199,25 +199,25 @@ client.on('messageCreate', async (message) => {
 
   if (command === 'createevent') {
     if (!isAdmin(message.member)) return message.channel.send('No permission to create events.');
-    const embed = new EmbedBuilder().setTitle('📅 Event-Erstellung').setDescription('Klicke auf den Button, um ein neues Event zu erstellen.').setColor(0x00AEFF);
+    const embed = new EmbedBuilder().setTitle('📅 Event-Hosting').setDescription('Click on the Button to host a new Event.').setColor(0x00AEFF);
     const button = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('start_event_modal').setLabel('Event erstellen').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId('start_event_modal').setLabel('Host Event').setStyle(ButtonStyle.Primary)
     );
     try {
       await message.author.send({ embeds: [embed], components: [button] });
-      await message.channel.send('📬 Ich habe dir eine DM zur Event-Erstellung geschickt.');
+      await message.channel.send('📬 Ive sent you a DM to host the Event.');
     } catch (err) {
-      return message.channel.send('❌ Konnte dir keine DM senden. Bitte prüfe deine Privatsphäre-Einstellungen.');
+      return message.channel.send('❌ Couldnt send you a DM please check your Privacy Settings');
     }
   }
 });
 
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton() && interaction.customId === 'start_event_modal') {
-    const modal = new ModalBuilder().setCustomId('event_modal').setTitle('📝 Neues Event erstellen');
-    const titleInput = new TextInputBuilder().setCustomId('event_title').setLabel('Titel des Events').setStyle(TextInputStyle.Short).setRequired(true);
-    const descInput = new TextInputBuilder().setCustomId('event_desc').setLabel('Beschreibung').setStyle(TextInputStyle.Paragraph).setRequired(true);
-    const dateInput = new TextInputBuilder().setCustomId('event_date').setLabel('Datum (DD MM YYYY)').setStyle(TextInputStyle.Short).setRequired(true);
+    const modal = new ModalBuilder().setCustomId('event_modal').setTitle('📝 Host a new Event');
+    const titleInput = new TextInputBuilder().setCustomId('event_title').setLabel('Titel of the Event').setStyle(TextInputStyle.Short).setRequired(true);
+    const descInput = new TextInputBuilder().setCustomId('event_desc').setLabel('Description').setStyle(TextInputStyle.Paragraph).setRequired(true);
+    const dateInput = new TextInputBuilder().setCustomId('event_date').setLabel('Date (DD MM YYYY)').setStyle(TextInputStyle.Short).setRequired(true);
     modal.addComponents(
       new ActionRowBuilder().addComponents(titleInput),
       new ActionRowBuilder().addComponents(descInput),
@@ -237,27 +237,27 @@ client.on('interactionCreate', async (interaction) => {
     const timeSelect = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('event_time_select')
-        .setPlaceholder('Uhrzeit auswählen')
+        .setPlaceholder('Choose time')
         .addOptions(['16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(t => ({ label: t + ' Uhr', value: t })))
     );
 
-    await interaction.reply({ content: '✅ Bitte wähle nun die Uhrzeit für dein Event:', components: [timeSelect], ephemeral: true });
+    await interaction.reply({ content: '✅ Please Chose a time for the Event:', components: [timeSelect], ephemeral: true });
   }
 
   if (interaction.isStringSelectMenu() && interaction.customId === 'event_time_select') {
     const userId = interaction.user.id;
     const time = interaction.values[0];
     const eventData = data.tempEvents[userId];
-    if (!eventData) return interaction.reply({ content: '❌ Fehler beim Laden des Events.', ephemeral: true });
+    if (!eventData) return interaction.reply({ content: '❌ Error loading the Event.', ephemeral: true });
 
     const eventEmbed = new EmbedBuilder()
       .setTitle(eventData.title)
-      .setDescription(`${eventData.desc}\n\n📅 **${eventData.date}** um **${time} Uhr**\n👤 Erstellt von ${interaction.user.username}`)
+      .setDescription(`${eventData.desc}\n\n📅 **${eventData.date}** um **${time} Uhr**\n👤 Hosted by ${interaction.user.username}`)
       .setColor(0x00ff99)
       .setTimestamp();
 
     const eventsChannel = interaction.guild.channels.cache.find(c => c.name === 'events' && c.type === ChannelType.GuildText);
-    if (!eventsChannel) return interaction.reply({ content: '❌ Event-Channel nicht gefunden.', ephemeral: true });
+    if (!eventsChannel) return interaction.reply({ content: '❌ Event-Channel not found.', ephemeral: true });
 
     data.events.push({
       title: eventData.title,
