@@ -1,6 +1,20 @@
 const fs = require('fs');
 const express = require('express');
-const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  PermissionsBitField,
+  ActionRowBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
+  EmbedBuilder,
+  ChannelType,
+  ButtonBuilder,
+  ButtonStyle,
+  Events,
+} = require('discord.js');
 
 const app = express();
 const dataFile = './data.json';
@@ -11,7 +25,8 @@ let data = {
   voiceTimes: {},
   voiceDurations: {},
   locked: false,
-  events: []
+  events: [],
+  tempEvents: {}
 };
 
 if (fs.existsSync(dataFile)) {
@@ -41,7 +56,6 @@ const client = new Client({
   ],
 });
 
-// Admin-Rollenprüfung
 function isAdmin(member) {
   return member.roles.cache.some(role =>
     role.name === 'Senator' || role.name === 'Technician🔧'
@@ -54,7 +68,6 @@ client.once('ready', () => {
 
 client.login(process.env.BOT_TOKEN);
 
-// Voice-Zeiterfassung
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
 
@@ -65,10 +78,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
   if (oldState.channel && !newState.channel && data.voiceTimes[userId]) {
     const duration = (Date.now() - data.voiceTimes[userId]) / 1000;
-    if (!data.voiceDurations[userId]) data.voiceDurations[userId] = 0;
-    data.voiceDurations[userId] += duration;
-
-    console.log(`${newState.member.user.username} has now spent a total ${Math.round(data.voiceDurations[userId])} Sekunden in Voice-Chat.`);
+    data.voiceDurations[userId] = (data.voiceDurations[userId] || 0) + duration;
     delete data.voiceTimes[userId];
     saveData();
   }
@@ -76,24 +86,16 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
-
   const userId = message.author.id;
 
-  // Begrüßung
-  if (message.channel.name === 'introductions') {
-    if (!data.greeted.includes(userId)) {
-      await message.channel.send(`Welcome to the server, ${message.author.username}! 🎉`);
-      data.greeted.push(userId);
-      saveData();
-    }
+  if (message.channel.name === 'introductions' && !data.greeted.includes(userId)) {
+    await message.channel.send(`Welcome to the server, ${message.author.username}! 🎉`);
+    data.greeted.push(userId);
+    saveData();
   }
 
-  // Nachrichtenzähler
-  if (!data.messageCounts[userId]) data.messageCounts[userId] = 0;
-  data.messageCounts[userId]++;
+  data.messageCounts[userId] = (data.messageCounts[userId] || 0) + 1;
   saveData();
-
-  console.log(`${message.author.username} has sent ${data.messageCounts[userId]} Messages.`);
 
   const count = data.messageCounts[userId];
   const roleNames = [
@@ -120,161 +122,155 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(prefix.length).trim().split(/\s+/);
   const command = args.shift().toLowerCase();
 
-  // 🔹 STATS COMMANDS
+  if (data.locked && !isAdmin(message.member)) return message.channel.send('🚫 Bot is currently locked by an admin.');
+
   if (command === 'mystats') {
     const messages = data.messageCounts[userId] || 0;
     const voiceTime = Math.round(data.voiceDurations[userId] || 0);
-
-    const hours = Math.floor(voiceTime / 3600);
-    const minutes = Math.floor((voiceTime % 3600) / 60);
-    const seconds = Math.floor(voiceTime % 60);
-
-    return message.channel.send(`${message.author.username}, you have sent ${messages} Messages and spent ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
+    const h = Math.floor(voiceTime / 3600);
+    const m = Math.floor((voiceTime % 3600) / 60);
+    const s = Math.floor(voiceTime % 60);
+    return message.channel.send(`${message.author.username}, you have sent ${messages} Messages and spent ${h}h ${m}m ${s}s in Voice-Chat.`);
   }
 
   if (command === 'userstats') {
-    if (args.length === 0) return message.channel.send('Please mention a user, e.g. !userstats @User');
     const user = message.mentions.users.first();
     if (!user) return message.channel.send('Please mention a valid user.');
     const uid = user.id;
     const messages = data.messageCounts[uid] || 0;
     const voiceTime = Math.round(data.voiceDurations[uid] || 0);
-
-    const hours = Math.floor(voiceTime / 3600);
-    const minutes = Math.floor((voiceTime % 3600) / 60);
-    const seconds = Math.floor(voiceTime % 60);
-
-    return message.channel.send(`${user.username} has sent ${messages} Messages and spent ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
+    const h = Math.floor(voiceTime / 3600);
+    const m = Math.floor((voiceTime % 3600) / 60);
+    const s = Math.floor(voiceTime % 60);
+    return message.channel.send(`${user.username} has sent ${messages} Messages and spent ${h}h ${m}m ${s}s in Voice-Chat.`);
   }
 
-  // 🔹 ADMIN COMMANDS (Senator & Technician🔧)
+  if (command === 'help') {
+    return message.channel.send(`📜 **Available Commands**\n- !mystats\n- !userstats @user\n- !help\n- !serverstats\n🔧 **Admin Commands**\n- !test\n- !resetstats @user\n- !topchatters\n- !topvoice\n- !lockbot\n- !createevent`);
+  }
+
+  if (command === 'test') {
+    if (!isAdmin(message.member)) return message.channel.send('No permission.');
+    return message.channel.send('✅ Bot test passed.');
+  }
+
   if (command === 'resetstats') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to use this command.');
-    }
+    if (!isAdmin(message.member)) return message.channel.send('No permission.');
     const user = message.mentions.users.first();
-    if (!user) return message.channel.send('Please mention a valid user.');
-
-    const uid = user.id;
-    delete data.messageCounts[uid];
-    delete data.voiceDurations[uid];
-    delete data.voiceTimes[uid];
+    if (!user) return message.channel.send('Please mention a user.');
+    delete data.messageCounts[user.id];
+    delete data.voiceDurations[user.id];
+    delete data.voiceTimes[user.id];
     saveData();
-
-    return message.channel.send(`Statistics from ${user.username} have been reset.`);
+    return message.channel.send(`Stats from ${user.username} have been reset.`);
   }
 
   if (command === 'topchatters') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to use this command.');
+    if (!isAdmin(message.member)) return message.channel.send('No permission.');
+    const sorted = Object.entries(data.messageCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    let text = '**Top 5 Chatters:**\n';
+    for (const [uid, count] of sorted) {
+      const member = await message.guild.members.fetch(uid).catch(() => null);
+      text += `${member?.user?.username || 'Unknown'}: ${count} Messages\n`;
     }
-
-    const sortedUsers = Object.entries(data.messageCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5);
-
-    if (sortedUsers.length === 0) return message.channel.send('No message data available.');
-
-    let reply = '**Top 5 Chatters:**\n';
-    const lines = await Promise.all(sortedUsers.map(async ([uid, count], i) => {
-      try {
-        const member = await message.guild.members.fetch(uid);
-        return `${i + 1}. ${member.user.username}: ${count} Messages`;
-      } catch {
-        return `${i + 1}. (Unknown User): ${count} Messages`;
-      }
-    }));
-
-    reply += lines.join('\n');
-    return message.channel.send(reply);
+    return message.channel.send(text);
   }
 
   if (command === 'topvoice') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to use this command.');
-    }
-
-    const sortedUsers = Object.entries(data.voiceDurations)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5);
-
-    if (sortedUsers.length === 0) return message.channel.send('No voice chat data available.');
-
-    let reply = '**Top 5 Voice Chat Users:**\n';
-    const lines = await Promise.all(sortedUsers.map(async ([uid, seconds], i) => {
+    if (!isAdmin(message.member)) return message.channel.send('No permission.');
+    const sorted = Object.entries(data.voiceDurations).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    let text = '**Top 5 Voice Chat Users:**\n';
+    for (const [uid, seconds] of sorted) {
       const h = Math.floor(seconds / 3600);
       const m = Math.floor((seconds % 3600) / 60);
       const s = Math.floor(seconds % 60);
-      try {
-        const member = await message.guild.members.fetch(uid);
-        return `${i + 1}. ${member.user.username}: ${h}h ${m}m ${s}s`;
-      } catch {
-        return `${i + 1}. (Unknown user): ${h}h ${m}m ${s}s`;
-      }
-    }));
-
-    reply += lines.join('\n');
-    return message.channel.send(reply);
-  }
-
-  // 🔹 TEST / DEBUG COMMAND
-  if (command === 'test') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to use this command.');
+      const member = await message.guild.members.fetch(uid).catch(() => null);
+      text += `${member?.user?.username || 'Unknown'}: ${h}h ${m}m ${s}s\n`;
     }
-    return message.channel.send('✅ Test was a success. Bot works.');
+    return message.channel.send(text);
   }
 
-  // 🔹 BOT LOCK / UNLOCK
   if (command === 'lockbot') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to use this command.');
-    }
+    if (!isAdmin(message.member)) return message.channel.send('No permission.');
     data.locked = !data.locked;
     saveData();
     return message.channel.send(`🔒 Bot is now ${data.locked ? 'locked' : 'unlocked'}.`);
   }
 
-  if (data.locked && !isAdmin(message.member)) {
-    return message.channel.send('🚫 Bot is currently locked by an admin.');
+  if (command === 'createevent') {
+    if (!isAdmin(message.member)) return message.channel.send('No permission to create events.');
+    const embed = new EmbedBuilder().setTitle('📅 Event-Erstellung').setDescription('Klicke auf den Button, um ein neues Event zu erstellen.').setColor(0x00AEFF);
+    const button = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('start_event_modal').setLabel('Event erstellen').setStyle(ButtonStyle.Primary)
+    );
+    try {
+      await message.author.send({ embeds: [embed], components: [button] });
+      await message.channel.send('📬 Ich habe dir eine DM zur Event-Erstellung geschickt.');
+    } catch (err) {
+      return message.channel.send('❌ Konnte dir keine DM senden. Bitte prüfe deine Privatsphäre-Einstellungen.');
+    }
+  }
+});
+
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isButton() && interaction.customId === 'start_event_modal') {
+    const modal = new ModalBuilder().setCustomId('event_modal').setTitle('📝 Neues Event erstellen');
+    const titleInput = new TextInputBuilder().setCustomId('event_title').setLabel('Titel des Events').setStyle(TextInputStyle.Short).setRequired(true);
+    const descInput = new TextInputBuilder().setCustomId('event_desc').setLabel('Beschreibung').setStyle(TextInputStyle.Paragraph).setRequired(true);
+    const dateInput = new TextInputBuilder().setCustomId('event_date').setLabel('Datum (DD MM YYYY)').setStyle(TextInputStyle.Short).setRequired(true);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(titleInput),
+      new ActionRowBuilder().addComponents(descInput),
+      new ActionRowBuilder().addComponents(dateInput)
+    );
+    await interaction.showModal(modal);
   }
 
-  // 🔹 EVENT ERSTELLEN
-  if (command === 'createevent') {
-    if (!isAdmin(message.member)) {
-      return message.channel.send('You do not have permission to create events.');
-    }
+  if (interaction.isModalSubmit() && interaction.customId === 'event_modal') {
+    const title = interaction.fields.getTextInputValue('event_title');
+    const desc = interaction.fields.getTextInputValue('event_desc');
+    const date = interaction.fields.getTextInputValue('event_date');
 
-    const eventText = args.join(' ');
-    if (!eventText) return message.channel.send('Please provide a name or description for the event.');
-
-    data.events.push({ text: eventText, by: message.author.username, timestamp: Date.now() });
+    data.tempEvents[interaction.user.id] = { title, desc, date };
     saveData();
 
-    return message.channel.send(`📅 Event created: ${eventText}`);
+    const timeSelect = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('event_time_select')
+        .setPlaceholder('Uhrzeit auswählen')
+        .addOptions(['16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(t => ({ label: t + ' Uhr', value: t })))
+    );
+
+    await interaction.reply({ content: '✅ Bitte wähle nun die Uhrzeit für dein Event:', components: [timeSelect], ephemeral: true });
   }
 
-  // 🔹 HELP COMMAND
-  if (command === 'help') {
-    return message.channel.send(`
-📜 **Available Commands**
-- !mystats – Deine Statistik
-- !userstats @user – Statistik von User
-- !help – Diese Übersicht
+  if (interaction.isStringSelectMenu() && interaction.customId === 'event_time_select') {
+    const userId = interaction.user.id;
+    const time = interaction.values[0];
+    const eventData = data.tempEvents[userId];
+    if (!eventData) return interaction.reply({ content: '❌ Fehler beim Laden des Events.', ephemeral: true });
 
-🔧 **Admin Commands** (Senator / Technician🔧):
-- !test – Bot-Test
-- !resetstats @user – Reset Stats
-- !topchatters – Top Chatter
-- !topvoice – Top Voice
-- !lockbot – lock/unlock Bot
-- !createevent <Beschreibung> – Start an event
-    `);
-  }
+    const eventEmbed = new EmbedBuilder()
+      .setTitle(eventData.title)
+      .setDescription(`${eventData.desc}\n\n📅 **${eventData.date}** um **${time} Uhr**\n👤 Erstellt von ${interaction.user.username}`)
+      .setColor(0x00ff99)
+      .setTimestamp();
 
-  // 🔹 SERVERSTATS
-  if (command === 'serverstats') {
-    const memberCount = message.guild.memberCount;
-    return message.channel.send(`👥 This server has ${memberCount} members.`);
+    const eventsChannel = interaction.guild.channels.cache.find(c => c.name === 'events' && c.type === ChannelType.GuildText);
+    if (!eventsChannel) return interaction.reply({ content: '❌ Event-Channel nicht gefunden.', ephemeral: true });
+
+    data.events.push({
+      title: eventData.title,
+      desc: eventData.desc,
+      date: eventData.date,
+      time,
+      by: interaction.user.username,
+      timestamp: Date.now()
+    });
+    delete data.tempEvents[userId];
+    saveData();
+
+    await eventsChannel.send({ content: `📢 @everyone`, embeds: [eventEmbed] });
+    await interaction.update({ content: '✅ Dein Event wurde im #events-Channel erstellt!', components: [] });
   }
 });
