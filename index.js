@@ -279,7 +279,14 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('event_time_select')
         .setPlaceholder('Choose time')
         .addOptions(
-          ['16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(t => ({
+          ['00:00', '00:30', '01:00', '01:30', '02:00', '02:30',
+  '03:00', '03:30', '04:00', '04:30', '05:00', '05:30',
+  '06:00', '06:30', '07:00', '07:30', '08:00', '08:30',
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30',
+  '21:00', '21:30', '22:00', '22:30', '23:00', '23:30'].map(t => ({
             label: `${t} Uhr`,
             value: t,
           }))
@@ -298,10 +305,10 @@ client.on('interactionCreate', async (interaction) => {
     if (!eventData) return interaction.reply({ content: '❌ Error loading the Event.', ephemeral: true });
 
     const guild = client.guilds.cache.get(eventData.guildId);
-    if (!guild) return interaction.reply({ content: '❌ Server nicht gefunden.', ephemeral: true });
+    if (!guild) return interaction.reply({ content: '❌ Server not found.', ephemeral: true });
 
     const eventsChannel = guild.channels.cache.find(c => c.name === 'events' && c.type === ChannelType.GuildText);
-    if (!eventsChannel) return interaction.reply({ content: '❌ Event-Channel nicht gefunden.', ephemeral: true });
+    if (!eventsChannel) return interaction.reply({ content: '❌ Event-Channel not found.', ephemeral: true });
 
     const eventEmbed = new EmbedBuilder()
       .setTitle(eventData.title)
@@ -321,6 +328,6 @@ client.on('interactionCreate', async (interaction) => {
     saveData();
 
     await eventsChannel.send({ content: `📢 @everyone`, embeds: [eventEmbed] });
-    await interaction.update({ content: '✅ Dein Event wurde im #events-Channel erstellt!', components: [] });
+    await interaction.update({ content: '✅ Your Event has been hosted in #events!', components: [] });
   }
 });
