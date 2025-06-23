@@ -44,7 +44,7 @@ const client = new Client({
 // Admin-Rollenprüfung
 function isAdmin(member) {
   return member.roles.cache.some(role =>
-    role.name === 'Senator' || role.name === 'Technician🔧'
+    role.name === 'Senator' || role.name === 'Technician :wrench:'
   );
 }
 
