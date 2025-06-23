@@ -147,4 +147,134 @@ client.on('messageCreate', async (message) => {
     return message.channel.send(`${user.username} has sent ${messages} Messages and spent ${hours}h ${minutes}m ${seconds}s in Voice-Chat.`);
   }
 
-  // 🔹 ADMIN COMMANDS (Se
+  // 🔹 ADMIN COMMANDS (Senator & Technician🔧)
+  if (command === 'resetstats') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+    const user = message.mentions.users.first();
+    if (!user) return message.channel.send('Please mention a valid user.');
+
+    const uid = user.id;
+    delete data.messageCounts[uid];
+    delete data.voiceDurations[uid];
+    delete data.voiceTimes[uid];
+    saveData();
+
+    return message.channel.send(`Statistics from ${user.username} have been reset.`);
+  }
+
+  if (command === 'topchatters') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+
+    const sortedUsers = Object.entries(data.messageCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    if (sortedUsers.length === 0) return message.channel.send('No message data available.');
+
+    let reply = '**Top 5 Chatters:**\n';
+    const lines = await Promise.all(sortedUsers.map(async ([uid, count], i) => {
+      try {
+        const member = await message.guild.members.fetch(uid);
+        return `${i + 1}. ${member.user.username}: ${count} Messages`;
+      } catch {
+        return `${i + 1}. (Unknown User): ${count} Messages`;
+      }
+    }));
+
+    reply += lines.join('\n');
+    return message.channel.send(reply);
+  }
+
+  if (command === 'topvoice') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+
+    const sortedUsers = Object.entries(data.voiceDurations)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    if (sortedUsers.length === 0) return message.channel.send('No voice chat data available.');
+
+    let reply = '**Top 5 Voice Chat Users:**\n';
+    const lines = await Promise.all(sortedUsers.map(async ([uid, seconds], i) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      try {
+        const member = await message.guild.members.fetch(uid);
+        return `${i + 1}. ${member.user.username}: ${h}h ${m}m ${s}s`;
+      } catch {
+        return `${i + 1}. (Unknown user): ${h}h ${m}m ${s}s`;
+      }
+    }));
+
+    reply += lines.join('\n');
+    return message.channel.send(reply);
+  }
+
+  // 🔹 TEST / DEBUG COMMAND
+  if (command === 'test') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+    return message.channel.send('✅ Test erfolgreich. Bot funktioniert.');
+  }
+
+  // 🔹 BOT LOCK / UNLOCK
+  if (command === 'lockbot') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to use this command.');
+    }
+    data.locked = !data.locked;
+    saveData();
+    return message.channel.send(`🔒 Bot is now ${data.locked ? 'locked' : 'unlocked'}.`);
+  }
+
+  if (data.locked && !isAdmin(message.member)) {
+    return message.channel.send('🚫 Bot is currently locked by an admin.');
+  }
+
+  // 🔹 EVENT ERSTELLEN
+  if (command === 'createevent') {
+    if (!isAdmin(message.member)) {
+      return message.channel.send('You do not have permission to create events.');
+    }
+
+    const eventText = args.join(' ');
+    if (!eventText) return message.channel.send('Please provide a name or description for the event.');
+
+    data.events.push({ text: eventText, by: message.author.username, timestamp: Date.now() });
+    saveData();
+
+    return message.channel.send(`📅 Event created: ${eventText}`);
+  }
+
+  // 🔹 HELP COMMAND
+  if (command === 'help') {
+    return message.channel.send(`
+📜 **Available Commands**
+- !mystats – Deine Statistik
+- !userstats @user – Statistik von User
+- !help – Diese Übersicht
+
+🔧 **Admin Commands** (Senator / Technician🔧):
+- !test – Bot-Test
+- !resetstats @user – Stats zurücksetzen
+- !topchatters – Top Chatter
+- !topvoice – Top Voice
+- !lockbot – Bot sperren/entsperren
+- !createevent <Beschreibung> – Event erstellen
+    `);
+  }
+
+  // 🔹 SERVERSTATS
+  if (command === 'serverstats') {
+    const memberCount = message.guild.memberCount;
+    return message.channel.send(`👥 This server has ${memberCount} members.`);
+  }
+});
